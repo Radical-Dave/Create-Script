@@ -105,7 +105,7 @@ begin {
 		$template = [Environment]::GetEnvironmentVariable("$eKey-$tKey", $scope)
         Write-Verbose "template persisted using -PersistForCurrentUser:$template"
 		if (!$template) {
-			$template = $PSScriptPath
+			$template = $PSScriptName
 		}
 	}
 
@@ -117,7 +117,7 @@ process {
         if ($PersistForCurrentUser) {
             Write-Verbose "PersistForCurrentUser-repos:$repos,template:$template"
             [Environment]::SetEnvironmentVariable("$eKey-$rKey", $repos, $scope)
-            [Environment]::SetEnvironmentVariable("$eKey-$tKey", $template, $scope)                
+            if ($template) { [Environment]::SetEnvironmentVariable("$eKey-$tKey", $template, $scope) }
             if (!$name) { Exit 0 }
         }
 
@@ -137,10 +137,12 @@ process {
             New-Item -Path $path -ItemType Directory | Out-Null
         }
 
-        if (Test-Path $template) {
-            $content = Get-Content $template
+        if (Test-Path (Join-Path $repos $template)) {
+            Write-Verbose "Copying template: $template"
+			Copy-Item -Path $path -Destination $template -PassThru | Out-Null   
         }
 
+        $content = Get-Content (Join-Path $template "$template.ps1")
         Write-Verbose "content:$content"
         if ($template = $PSScriptName) {
             $content = $content.Replace("Create-Script", $name)
@@ -151,6 +153,7 @@ process {
             $content = $content.Replace("Create PowerShell Script in folder [Name]/[Name].ps1 based on template", $description)
             $content = $content.Replace("Template and Repos (aka Destination path) can be persisted using -PersistForCurrentUser", "")
         } else {
+            $content = $content.Replace($template, $name)
             $content = $content.Replace("@@guid@@", "$(New-Guid)")
             $content = $content.Replace("@@author@@", $env:USERNAME)
             $content = $content.Replace("@@description@@", $description)
